@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hanami — Expense Tracker</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- drifting sakura petals, purely decorative -->
+<canvas id="petals" aria-hidden="true"></canvas>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">🌸</span>
+      <div>
+        <h1>Hanami</h1>
+        <p class="brand-sub">expense tracker</p>
+      </div>
+    </div>
+
+    <nav class="nav-group" aria-label="Main navigation">
+      <button class="nav active" data-page="dashboard"><span class="nav-ic">🏠</span>Dashboard</button>
+      <button class="nav" data-page="expense"><span class="nav-ic">➕</span>Add Expense</button>
+      <button class="nav" data-page="reports"><span class="nav-ic">📊</span>Reports</button>
+      <button class="nav" data-page="goals"><span class="nav-ic">🎯</span>Goals</button>
+    </nav>
+
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark and light mode">
+      <span id="themeIcon">🌙</span> <span id="themeLabel">Dark mode</span>
+    </button>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+
+    <!-- ---------- DASHBOARD ---------- -->
+    <section id="dashboard" class="page">
+      <header class="page-head">
+        <div class="page-head-row">
+          <div>
+            <p class="eyebrow">Welcome back</p>
+            <h2>Your money garden 🌿</h2>
+          </div>
+          <div id="streakBadge" class="streak-badge hidden">
+            <span id="streakFlame">🔥</span>
+            <span id="streakCount">0</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- date range filter -->
+      <div class="filter-pills" role="group" aria-label="Date range filter">
+        <button class="pill active" data-range="week">This week</button>
+        <button class="pill" data-range="month">This month</button>
+        <button class="pill" data-range="all">All time</button>
+      </div>
+
+      <!-- smart insight, computed from current data -->
+      <div id="insightBanner" class="insight-banner hidden">
+        <span class="insight-ic">💡</span>
+        <span id="insightText"></span>
+      </div>
+
+      <div class="grid-2">
+        <div class="card hero-card">
+          <p class="card-label">Total spent</p>
+          <h1 id="total">₹0</h1>
+          <p id="saving" class="saving-text"></p>
+          <p id="momCompare" class="mom-compare hidden"></p>
+
+          <div class="progress" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuemax="100">
+            <div id="fill"></div>
+          </div>
+          <p class="progress-caption"><span id="goalTextSmall">Goal ₹0</span></p>
+        </div>
+
+        <div class="card chart-card">
+          <p class="card-label">By category</p>
+          <div class="chart-wrap">
+            <canvas id="chart"></canvas>
+            <p id="chartEmpty" class="empty-hint hidden">No expenses yet — add one to see your breakdown 🍃</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- quick-add chips for repeat purchases -->
+      <div class="card">
+        <p class="card-label">Quick add</p>
+        <div id="quickAddRow" class="quick-add-row"></div>
+      </div>
+
+      <div class="card">
+        <div class="list-head">
+          <p class="card-label">Recent expenses</p>
+          <input id="search" type="text" placeholder="🔍 Search expenses…" aria-label="Search expenses">
+        </div>
+
+        <div id="bulkBar" class="bulk-bar hidden">
+          <label class="bulk-select-all">
+            <input type="checkbox" id="selectAllCheck">
+            <span id="selectedCount">0 selected</span>
+          </label>
+          <button id="bulkDeleteBtn" class="ghost-btn danger-btn">🗑️ Delete selected</button>
+        </div>
+
+        <ul id="list"></ul>
+        <p id="listEmpty" class="empty-hint hidden">Nothing here yet. Tap "Add Expense" to plant your first one 🌱</p>
+      </div>
+    </section>
+
+    <!-- ---------- ADD EXPENSE ---------- -->
+    <section id="expense" class="page hidden">
+      <header class="page-head">
+        <p class="eyebrow" id="formEyebrow">New entry</p>
+        <h2 id="formHeading">Add an expense ✨</h2>
+      </header>
+
+      <div class="card ai-parse-card" id="aiParseCard">
+        <p class="card-label">✨ Or just describe it</p>
+        <div class="ai-parse-row">
+          <input id="aiParseInput" type="text" placeholder="e.g. spent 250 on momos with friends yesterday" autocomplete="off">
+          <button id="aiParseBtn" class="primary-btn ai-parse-btn" type="button">Fill form ✨</button>
+        </div>
+        <p id="aiParseStatus" class="ai-parse-status"></p>
+        <p id="aiParseNoKey" class="field-hint hidden">
+          Add your Anthropic API key in <button type="button" id="goToAiSettingsLink" class="inline-link-btn">Goals → AI settings</button> to turn this on.
+        </p>
+      </div>
+
+      <form class="card form-card" id="expenseForm">
+        <label class="field-label" for="expenseName">What was it for?</label>
+        <input id="expenseName" type="text" placeholder="e.g. Bubble tea" autocomplete="off">
+
+        <label class="field-label" for="expenseAmount">Amount</label>
+        <input id="expenseAmount" type="number" min="0" step="0.01" placeholder="0.00">
+
+        <div class="field-label-row">
+          <label class="field-label" for="expenseCategory">Category</label>
+          <span id="aiSuggestStatus" class="ai-suggest-status hidden"></span>
+        </div>
+        <select id="expenseCategory">
+          <option value="Food">🍜 Food</option>
+          <option value="Travel">🚌 Travel</option>
+          <option value="Shopping">🛍️ Shopping</option>
+          <option value="Bills">🧾 Bills</option>
+          <option value="Other">🌙 Other</option>
+        </select>
+
+        <label class="recurring-toggle">
+          <input type="checkbox" id="recurringCheck">
+          <span>🔁 Repeat this expense automatically</span>
+        </label>
+
+        <select id="recurringFrequency" class="hidden">
+          <option value="monthly">Every month</option>
+          <option value="weekly">Every week</option>
+        </select>
+
+        <div class="form-actions">
+          <button type="submit" id="addExpenseBtn" class="primary-btn">Save Expense ✨</button>
+          <button type="button" id="cancelEditBtn" class="ghost-btn hidden">Cancel</button>
+        </div>
+        <input type="hidden" id="editId">
+      </form>
+
+      <div class="card" id="recurringListCard">
+        <p class="card-label">Active recurring expenses</p>
+        <ul id="recurringList"></ul>
+        <p id="recurringEmpty" class="empty-hint hidden">No recurring expenses set up yet.</p>
+      </div>
+    </section>
+
+    <!-- ---------- REPORTS ---------- -->
+    <section id="reports" class="page hidden">
+      <header class="page-head">
+        <p class="eyebrow">Monthly recap</p>
+        <h2>Your reports 📊</h2>
+      </header>
+
+      <div class="card">
+        <p class="card-label" id="monthlyReport">0 expenses this month</p>
+        <div id="breakdown" class="breakdown"></div>
+
+        <div class="export-row">
+          <button id="exportCsvBtn" class="ghost-btn">📤 Export CSV</button>
+          <button id="exportPdfBtn" class="ghost-btn">📄 Export PDF</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-label">6-month trend</p>
+        <div class="chart-wrap trend-wrap">
+          <canvas id="trendChart"></canvas>
+          <p id="trendEmpty" class="empty-hint hidden">Log expenses across a few months to see your trend here 📈</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Budget vs actual (this month)</p>
+        <div id="budgetVsActual" class="budget-vs-actual"></div>
+        <p id="budgetVsActualEmpty" class="empty-hint hidden">Set category budgets on the Goals page to see this comparison.</p>
+      </div>
+    </section>
+
+    <!-- ---------- GOALS ---------- -->
+    <section id="goals" class="page hidden">
+      <header class="page-head">
+        <p class="eyebrow">Set a target</p>
+        <h2>Your savings goal 🎯</h2>
+      </header>
+
+      <div class="card form-card">
+        <label class="field-label" for="goalInput">Overall monthly budget</label>
+        <input id="goalInput" type="number" min="0" step="0.01" placeholder="e.g. 15000">
+        <button id="saveGoalBtn" class="primary-btn">Save Goal</button>
+        <p id="goalText" class="goal-display"></p>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Per-category budgets</p>
+        <p class="field-hint">Optional — set a limit for individual categories to track them separately.</p>
+        <div id="categoryBudgetRows" class="category-budget-rows"></div>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Backup &amp; restore</p>
+        <p class="field-hint">Everything here lives only in this browser. Download a backup so a cleared cache can't wipe your history.</p>
+        <div class="export-row">
+          <button id="backupBtn" class="ghost-btn">💾 Download backup</button>
+          <button id="restoreBtn" class="ghost-btn">📂 Restore from file</button>
+          <input type="file" id="restoreFileInput" accept="application/json" class="hidden">
+        </div>
+      </div>
+
+      <div class="card form-card">
+        <p class="card-label">✨ AI category suggestions</p>
+        <p class="field-hint">
+          Paste your own Anthropic API key to get smart category guesses while you type an expense name.
+          The key stays in this browser's storage and is sent only to <code>api.anthropic.com</code> — never anywhere else.
+          Get a key at <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>.
+        </p>
+        <label class="field-label" for="aiKeyInput">Anthropic API key</label>
+        <input id="aiKeyInput" type="password" placeholder="sk-ant-..." autocomplete="off">
+        <div class="form-actions">
+          <button id="saveAiKeyBtn" class="primary-btn">Save key</button>
+          <button id="clearAiKeyBtn" class="ghost-btn danger-btn hidden">Remove key</button>
+        </div>
+        <p id="aiKeyStatus" class="ai-key-status"></p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- toast for feedback messages -->
+<div id="toast" class="toast hidden">
+  <span id="toastText"></span>
+  <button id="toastUndoBtn" class="toast-undo hidden">Undo</button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
