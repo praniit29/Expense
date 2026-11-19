@@ -1,0 +1,23 @@
+{
+  "name": "hanami-expense-tracker",
+  "version": "1.0.0",
+  "description": "Hanami — Expense Tracker",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/praniit29/Expense.git"
+  },
+  "keywords": [
+    "expense-tracker",
+    "vanilla-javascript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/speed-insights": "^1.0.12"
+  }
+}
